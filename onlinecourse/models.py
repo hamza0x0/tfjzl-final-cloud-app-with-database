@@ -1,5 +1,6 @@
 import sys
 from django.utils.timezone import now
+
 try:
     from django.db import models
 except Exception:
@@ -37,19 +38,18 @@ class Learner(models.Model):
         (STUDENT, 'Student'),
         (DEVELOPER, 'Developer'),
         (DATA_SCIENTIST, 'Data Scientist'),
-        (DATABASE_ADMIN, 'Database Admin')
+        (DATABASE_ADMIN, 'Database Admin'),
     ]
     occupation = models.CharField(
         null=False,
         max_length=20,
         choices=OCCUPATION_CHOICES,
-        default=STUDENT
+        default=STUDENT,
     )
     social_link = models.URLField(max_length=200)
 
     def __str__(self):
-        return self.user.username + "," + \
-               self.occupation
+        return self.user.username + "," + self.occupation
 
 
 # Course model
@@ -64,8 +64,7 @@ class Course(models.Model):
     is_enrolled = False
 
     def __str__(self):
-        return "Name: " + self.name + "," + \
-               "Description: " + self.description
+        return "Name: " + self.name + "," + "Description: " + self.description
 
 
 # Lesson model
@@ -75,10 +74,12 @@ class Lesson(models.Model):
     course = models.ForeignKey(Course, on_delete=models.CASCADE)
     content = models.TextField()
 
+    def __str__(self):
+        return self.title
+
 
 # Enrollment model
 # <HINT> Once a user enrolled a class, an enrollment entry should be created between the user and course
-# And we could use the enrollment to track information such as exam submissions
 class Enrollment(models.Model):
     AUDIT = 'audit'
     HONOR = 'honor'
@@ -86,7 +87,7 @@ class Enrollment(models.Model):
     COURSE_MODES = [
         (AUDIT, 'Audit'),
         (HONOR, 'Honor'),
-        (BETA, 'BETA')
+        (BETA, 'BETA'),
     ]
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     course = models.ForeignKey(Course, on_delete=models.CASCADE)
@@ -95,9 +96,37 @@ class Enrollment(models.Model):
     rating = models.FloatField(default=5.0)
 
 
-# One enrollment could have multiple submission
-# One submission could have multiple choices
-# One choice could belong to multiple submissions
-#class Submission(models.Model):
-#    enrollment = models.ForeignKey(Enrollment, on_delete=models.CASCADE)
-#    choices = models.ManyToManyField(Choice)
+# Question model
+# A question belongs to a course and has a grade point
+class Question(models.Model):
+    course = models.ForeignKey(Course, on_delete=models.CASCADE)
+    content = models.CharField(max_length=200)
+    grade = models.IntegerField(default=50)
+
+    def __str__(self):
+        return "Question: " + self.content
+
+    # Returns True if the learner selected all the correct choices and no wrong one
+    def is_get_score(self, selected_ids):
+        all_answers = self.choice_set.filter(is_correct=True).count()
+        selected_correct = self.choice_set.filter(is_correct=True, id__in=selected_ids).count()
+        selected_wrong = self.choice_set.filter(is_correct=False, id__in=selected_ids).count()
+        return all_answers == selected_correct and selected_wrong == 0
+
+
+# Choice model
+# A choice belongs to a question and may be correct or not
+class Choice(models.Model):
+    question = models.ForeignKey(Question, on_delete=models.CASCADE)
+    content = models.CharField(max_length=200)
+    is_correct = models.BooleanField(default=False)
+
+    def __str__(self):
+        return self.content
+
+
+# Submission model
+# One enrollment can have many submissions, one submission can have many choices
+class Submission(models.Model):
+    enrollment = models.ForeignKey(Enrollment, on_delete=models.CASCADE)
+    choices = models.ManyToManyField(Choice)
